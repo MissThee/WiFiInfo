@@ -6,6 +6,22 @@
 
 extern const char *__progname;
 
+enum {
+	kCWSecurityNone                 = 0,
+	kCWSecurityWEP                  = 1,
+	kCWSecurityWPAPersonal          = 2,
+	kCWSecurityWPAPersonalMixed     = 3,
+	kCWSecurityWPA2Personal         = 4,
+	kCWSecurityPersonal             = 5,
+	kCWSecurityDynamicWEP           = 6,
+	kCWSecurityWPAEnterprise        = 7,
+	kCWSecurityWPAEnterpriseMixed   = 8,
+	kCWSecurityWPA2Enterprise       = 9,
+	kCWSecurityEnterprise           = 10,
+	kCWSecurityUnknown              = NSIntegerMax,
+};
+
+
 typedef struct __WiFiNetwork *WiFiNetworkRef;
 typedef struct __WiFiManager *WiFiManagerRef;
 
@@ -26,9 +42,10 @@ extern "C" CFStringRef WiFiNetworkGetSSID(WiFiNetworkRef network);
 	UIImageView* _lockView;
 	UIImageView* _barsView;
 }
+@property (nonatomic,retain) UILabel* labelSec;
 @property (nonatomic,retain) UILabel* labelRssi;
 @property (nonatomic,retain) UILabel* labelCan;
-@property (nonatomic,retain) UILabel* labelSec;
+@property (nonatomic,retain) UILabel* labelMac;
 @property (nonatomic,retain) WiFiNetwork * network;
 -(void)setDetailText:(id)arg1 ;
 @end
@@ -40,13 +57,20 @@ extern "C" CFStringRef WiFiNetworkGetSSID(WiFiNetworkRef network);
 @property (nonatomic,retain) NSNumber * channel; 
 @property (assign,nonatomic) long long securityMode;
 @property (retain) NSDictionary * attributes;
+@property (nonatomic,copy) NSString * crowdsourceDescription;   
+@property (copy,readonly) NSString * description; 
+@property (copy,readonly) NSString * debugDescription; 
 @end
 
 @interface WFNetworkListCell : UITableViewCell
+@property (nonatomic,retain) UILabel* labelSec;
 @property (nonatomic,retain) UILabel* labelRssi;
 @property (nonatomic,retain) UILabel* labelCan;
+@property (nonatomic,retain) UILabel* labelMac;
 @property (nonatomic,retain) WFNetworkScanRecord * network;
 @property (nonatomic,copy) NSString * title; 
+@property (nonatomic,copy) NSString * subtitleTmp; 
+@property (assign,nonatomic) BOOL hasInitMacAddr; 
 - (void)setSubtitle:(NSString*)arg1;
 @end
 
