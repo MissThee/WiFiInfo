@@ -62,6 +62,11 @@ extern "C" CFStringRef WiFiNetworkGetSSID(WiFiNetworkRef network);
 @property (copy,readonly) NSString * debugDescription; 
 @end
 
+@interface WFKnownNetworksViewController : NSObject
+@property (nonatomic,copy) NSArray * knownNetWorksArray; 
+@end
+
+
 @interface WFNetworkListCell : UITableViewCell
 @property (nonatomic,retain) UILabel* labelSec;
 @property (nonatomic,retain) UILabel* labelRssi;
@@ -83,7 +88,7 @@ extern "C" CFStringRef WiFiNetworkGetSSID(WiFiNetworkRef network);
 -(void)powerStateDidChange:(BOOL)arg1 ;
 @end
 
-@interface WFNetworkListController : UITableViewController
+@interface WFNetworkListController : UITableViewController 
 -(void)startScanning;
 -(void)stopScanning;
 @end

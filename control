@@ -1,6 +1,6 @@
 Package: com.missthee.wifiinfo
 Name: WiFiInfo
-Author: missthee
+Author: MissThee
 Description: WiFi 密码查看，移除弱信号过滤，显示额外信息
 Depends: mobilesubstrate
 Maintainer: missthee

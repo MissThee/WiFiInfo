@@ -1,5 +1,5 @@
 #import "WiFiInfo.h"
-
+#include <dlfcn.h>
 #define NSLog1(...)
 
 
@@ -164,7 +164,7 @@ if ([arg1 hasPrefix:@"MissThee"]){
 			
 			if(_barsView) {
 				
-			if(!self.labelRssi) {
+				if(!self.labelRssi) {
 					self.labelRssi = (UILabel *)[_barsView viewWithTag:4456]?:[[UILabel alloc] init];
 					self.labelRssi.tag = 4456;
 				}
@@ -327,19 +327,26 @@ static WFNetworkListController* currDelegate;
 %end
 
 %hook WFKnownNetworksViewController
+- (void)setKnownNetWorksArray:(id)arg1
+{
+	NSSortDescriptor *ns=[NSSortDescriptor sortDescriptorWithKey:nil ascending:YES];
+	arg1 = [(NSMutableArray*)arg1 sortedArrayUsingDescriptors:@[ns]];
+	self.knownNetWorksArray = arg1;
+}
+
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
 	UITableViewCell* cellOrig = %orig;
-   NSString* wfname = cellOrig.textLabel.text;
-   UITableViewCell* cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"myCell"];
-   cell.accessoryType = UITableViewCellAccessoryNone;
-   [cell setSelectionStyle:UITableViewCellSelectionStyleNone];
+	NSString* wfname = cellOrig.textLabel.text;
+	UITableViewCell* cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"myCell"];
+	cell.accessoryType = UITableViewCellAccessoryNone;
+	[cell setSelectionStyle:UITableViewCellSelectionStyleNone];
 	@try {
 		cell.textLabel.text = wfname;
-      cell.detailTextLabel.text = getPassForNetworkName(wfname)?:@"";
-      cell.textLabel.numberOfLines = 0;
-      cell.detailTextLabel.numberOfLines = 0;
-      cell.detailTextLabel.textColor = [UIColor grayColor];
+      	cell.textLabel.numberOfLines = 0;
+      	cell.detailTextLabel.text = getPassForNetworkName(wfname)?:@"";
+      	cell.detailTextLabel.numberOfLines = 0;
+      	cell.detailTextLabel.textColor = [UIColor grayColor];
       
 	} @catch(NSException* ex) {
 	}
