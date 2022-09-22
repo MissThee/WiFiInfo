@@ -1,6 +1,6 @@
 #import "WiFiInfo.h"
 #include <dlfcn.h>
-#define NSLog1(...)
+// #define NSLog1(...)
 
 
 static WiFiManagerRef wifiManager()
@@ -49,6 +49,31 @@ static NSString* getPassForNetworkName(NSString* networkName)
 	} @catch(NSException* ex) {
 	}
 	return passwordRet;
+}
+
+static NSDictionary* getDicForNetworkName(NSString* networkName)
+{
+	NSDictionary* recordRet = nil;
+	@try {
+		if(networkName) {
+			if(CFArrayRef networks = networksListArr()) {
+				for(id networkNow in (__bridge NSArray*)networks) {
+					if(CFStringRef name = WiFiNetworkGetSSID((__bridge WiFiNetworkRef)networkNow)) {
+						if([(__bridge NSString*)name isEqualToString:networkName]) {
+							if(CFDictionaryRef record = WiFiNetworkCopyRecord((__bridge WiFiNetworkRef)networkNow)) {
+								recordRet = (__bridge NSDictionary*)record;
+								CFRelease(record);
+							}
+							break;
+						}
+					}					
+				}
+			}
+		}
+	} @catch(NSException* ex) {
+		// NSLog(@"getLastJoinedAtForNetworkName异常:%@ %@",ex.name,ex.reason);
+	}
+	return recordRet;
 }
 
 static NSString* stringForSecurityMode(int securityMode)
@@ -106,6 +131,7 @@ static WFNetworkScanRecord* networkForName(NSString* name)
 	}
 	return nil;
 }
+
 
 %hook WFNetworkListCell
 %property (nonatomic, retain) id labelSec;
@@ -326,12 +352,58 @@ static WFNetworkListController* currDelegate;
 }
 %end
 
+static NSDate* getLastUseDate(NSDictionary* dic){
+	NSMutableArray* dates = [[NSMutableArray alloc] init];
+	// NSDate *addedAt = (NSDate *)[dic objectForKey:@"lastUpdated"];
+	// if(addedAt){
+	// 	 [dates addObject:addedAt];
+	// }
+	// NSDate *knownBSSUpdatedDate = (NSDate *)[dic objectForKey:@"knownBSSUpdatedDate"];
+	// if(knownBSSUpdatedDate){
+	// 	 [dates addObject:knownBSSUpdatedDate];
+	// }
+	NSDate *lastAutoJoined = (NSDate *)[dic objectForKey:@"lastAutoJoined"];
+	if(lastAutoJoined){
+		 [dates addObject:lastAutoJoined];
+	}
+	NSDate *lastJoined = (NSDate *)[dic objectForKey:@"lastJoined"];
+	if(lastJoined){
+		 [dates addObject:lastJoined];
+	}
+	NSDate *lastUpdated = (NSDate *)[dic objectForKey:@"lastUpdated"];
+	if(lastUpdated){
+		 [dates addObject:lastUpdated];
+	}
+	NSDate *prevJoined = (NSDate *)[dic objectForKey:@"prevJoined"];
+	if(prevJoined){
+		 [dates addObject:prevJoined];
+	}
+	// NSLog(@"----%@",[dates sortedArrayUsingComparator:^NSComparisonResult(NSDate *date1, NSDate *date2){
+	// 	return [date1 compare: date2];
+    // }]);
+	return [[dates sortedArrayUsingComparator:^NSComparisonResult(NSDate *date1, NSDate *date2){
+		return [date2 compare: date1];
+    }] objectAtIndex:0];
+
+}
+
 %hook WFKnownNetworksViewController
-- (void)setKnownNetWorksArray:(id)arg1
-{
-	NSSortDescriptor *ns=[NSSortDescriptor sortDescriptorWithKey:nil ascending:YES];
-	arg1 = [(NSMutableArray*)arg1 sortedArrayUsingDescriptors:@[ns]];
-	self.knownNetWorksArray = arg1;
+- (id)knownNetworksArray{
+	id networksArray = %orig;
+	return [networksArray sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2){
+		NSDate *date1 = getLastUseDate(getDicForNetworkName((NSString *)obj1)) ;
+		NSDate *date2 = getLastUseDate(getDicForNetworkName((NSString *)obj2)) ;
+		// if([(NSString *)obj1 isEqualToString:@"dengbasyq209-210"] ){
+		// 	NSLog(@" %@  %@",(NSString *)obj1,getDicForNetworkName((NSString *)obj1));
+		// }
+		//  NSOrderedAscending,    // < 升序
+    	//  NSOrderedSame,       // = 等于
+    	//  NSOrderedDescending   // > 降序
+		return [date2 compare: date1];
+    }];
+	// NSSortDescriptor *ns=[NSSortDescriptor sortDescriptorWithKey:nil ascending:YES];
+	// return [(NSMutableArray*)networksArray sortedArrayUsingDescriptors:@[ns]];
+ 
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
@@ -356,20 +428,13 @@ static WFNetworkListController* currDelegate;
 
 - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    if (tableView.editing) {
-        return UITableViewCellEditingStyleDelete;
-    }
-    else
-    {
-        return UITableViewCellEditingStyleNone;
-    }
+    return tableView.editing?UITableViewCellEditingStyleDelete:UITableViewCellEditingStyleNone;
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
-//点击事件
-//点击的cell
-//    UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
+// 点击事件,点击的cell
+// UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
   
 }
 
@@ -378,11 +443,13 @@ static WFNetworkListController* currDelegate;
 {
     return YES;
 }
+
 %new
 - (BOOL)tableView:(UITableView *)tableView canPerformAction:(SEL)action forRowAtIndexPath:(NSIndexPath *)indexPath withSender:(id)sender
 {
     return (action == @selector(copy:));
 }
+
 %new
 - (void)tableView:(UITableView *)tableView performAction:(SEL)action forRowAtIndexPath:(NSIndexPath *)indexPath withSender:(id)sender
 {
@@ -401,7 +468,6 @@ static WFNetworkListController* currDelegate;
 %ctor
 {
 	@autoreleasepool {
-	
 		dlopen("/System/Library/PreferenceBundles/AirPortSettings.bundle/AirPortSettings", RTLD_LAZY);
 		dlopen("/System/Library/PrivateFrameworks/WiFiKit.framework/WiFiKit", RTLD_LAZY);
 		dlopen("/System/Library/PrivateFrameworks/WiFiKitUI.framework/WiFiKitUI", RTLD_LAZY);

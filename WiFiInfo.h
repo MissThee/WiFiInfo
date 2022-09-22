@@ -2,7 +2,7 @@
 #import <notify.h>
 #import <Security/Security.h>
 #import <substrate.h>
-
+#import <UIKit/UIKit.h>
 
 extern const char *__progname;
 
@@ -29,6 +29,7 @@ extern "C" WiFiManagerRef WiFiManagerClientCreate(CFAllocatorRef allocator, int 
 extern "C" CFArrayRef WiFiManagerClientCopyNetworks(WiFiManagerRef manager);
 extern "C" CFStringRef WiFiNetworkCopyPassword(WiFiNetworkRef);
 extern "C" CFStringRef WiFiNetworkGetSSID(WiFiNetworkRef network);
+extern "C" CFDictionaryRef WiFiNetworkCopyRecord(WiFiNetworkRef network);
 
 @interface WiFiNetwork : NSObject
 - (id)initWithWirelessDict:(id)arg1;
@@ -38,17 +39,18 @@ extern "C" CFStringRef WiFiNetworkGetSSID(WiFiNetworkRef network);
 - (NSString*)password;
 - (int)securityMode;
 @end
-@interface APTableCell : UITableViewCell {
-	UIImageView* _lockView;
-	UIImageView* _barsView;
-}
-@property (nonatomic,retain) UILabel* labelSec;
-@property (nonatomic,retain) UILabel* labelRssi;
-@property (nonatomic,retain) UILabel* labelCan;
-@property (nonatomic,retain) UILabel* labelMac;
-@property (nonatomic,retain) WiFiNetwork * network;
--(void)setDetailText:(id)arg1 ;
-@end
+
+// @interface APTableCell : UITableViewCell {
+// 	UIImageView* _lockView;
+// 	UIImageView* _barsView;
+// }
+// @property (nonatomic,retain) UILabel* labelSec;
+// @property (nonatomic,retain) UILabel* labelRssi;
+// @property (nonatomic,retain) UILabel* labelCan;
+// @property (nonatomic,retain) UILabel* labelMac;
+// @property (nonatomic,retain) WiFiNetwork * network;
+// -(void)setDetailText:(id)arg1 ;
+// @end
 
 @interface WFNetworkScanRecord : NSObject
 @property (nonatomic,copy,readonly) NSString * bssid;
@@ -60,6 +62,7 @@ extern "C" CFStringRef WiFiNetworkGetSSID(WiFiNetworkRef network);
 @property (nonatomic,copy) NSString * crowdsourceDescription;   
 @property (copy,readonly) NSString * description; 
 @property (copy,readonly) NSString * debugDescription; 
+
 @end
 
 @interface WFKnownNetworksViewController : NSObject

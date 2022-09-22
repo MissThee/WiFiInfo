@@ -8,7 +8,6 @@ $(TWEAK_NAME)_PRIVATE_FRAMEWORKS = MobileWiFi
 $(TWEAK_NAME)_LDFLAGS = -Wl,-segalign,4000
 $(TWEAK_NAME)_CFLAGS = -fobjc-arc
 
-export ARCHS = arm64
-$(TWEAK_NAME)_ARCHS = arm64
+ARCHS = arm64e
 
 include $(THEOS_MAKE_PATH)/tweak.mk
