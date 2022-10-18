@@ -17,45 +17,6 @@ static WiFiManagerRef wifiManager()
 	return manager;
 }
 
-static CFArrayRef networksListArr()
-{
-	static time_t lastTime;
-	static CFArrayRef networks;
-	if(networks && (([[NSDate date] timeIntervalSince1970]-lastTime) > 5) ) { // 5secs refetch timeout
-		CFRelease(networks);
-		networks = nil;
-	}
-	if(!networks) {
-		lastTime = [[NSDate date] timeIntervalSince1970];
-		networks = WiFiManagerClientCopyNetworks(wifiManager());
-	}
-	return networks;
-}
-
-static NSString* getPassForNetworkName(NSString* networkName)
-{
-	NSString* passwordRet = nil;
-	@try {
-		if(networkName) {
-			if(CFArrayRef networks = networksListArr()) {
-				for(id networkNow in (__bridge NSArray*)networks) {
-					if(CFStringRef name = WiFiNetworkGetSSID((__bridge WiFiNetworkRef)networkNow)) {
-						if([(__bridge NSString*)name isEqualToString:networkName]) {
-							if(CFStringRef pass = WiFiNetworkCopyPassword((__bridge WiFiNetworkRef)networkNow)) {
-								passwordRet = [NSString stringWithFormat:@"%@", pass];
-								CFRelease(pass);
-							}
-							break;
-						}
-					}					
-				}
-			}
-		}
-	} @catch(NSException* ex) {
-	}
-	return passwordRet;
-}
-
 
 
 static NSString* stringForSecurityMode(int securityMode)
@@ -168,7 +129,6 @@ static WFNetworkScanRecord* networkForName(NSString* name)
 			// mac地址--------------------
 			self.macTmp = self.network.bssid;
 			[self setSubtitle:nil];
-			// NSLog(@"%@\n%@",@"-----------------------------------",self.network);
 			UIImageView* _lockView = (UIImageView *)object_getIvar(self, class_getInstanceVariable([self class], "_lockImageView"));
 			// lock icon
 			if(_lockView) {
@@ -190,7 +150,6 @@ static WFNetworkScanRecord* networkForName(NSString* name)
 					[_lockView addSubview:self.labelSec];
 				}
 			}
-			// NSLog(@"-------------------\n%@\n%@",self.associationStateView.imageView ,getIPAddress());
 			// signal icon
 			UIImageView* _barsView = (UIImageView *)object_getIvar(self, class_getInstanceVariable([self class], "_signalImageView"));
 			if(_barsView) {
@@ -274,6 +233,7 @@ static WFNetworkScanRecord* networkForName(NSString* name)
 }
 %end
 
+ 
 static WFNetworkListController* currDelegate;
 
 %hook WFAirportViewController
@@ -356,6 +316,47 @@ static WFNetworkListController* currDelegate;
 }
 %end
 
+
+static CFArrayRef networksListArr()
+{
+	static time_t lastTime;
+	static CFArrayRef networks;
+	if(networks && (([[NSDate date] timeIntervalSince1970]-lastTime) > 5) ) { // 5secs refetch timeout
+		CFRelease(networks);
+		networks = nil;
+	}
+	if(!networks) {
+		lastTime = [[NSDate date] timeIntervalSince1970];
+		networks = WiFiManagerClientCopyNetworks(wifiManager());
+	}
+	return networks;
+}
+
+static NSString* getPassForNetworkName(NSString* networkName)
+{
+	NSString* passwordRet = nil;
+	@try {
+		if(networkName) {
+			if(CFArrayRef networks = networksListArr()) {
+				for(id networkNow in (__bridge NSArray*)networks) {
+					if(CFStringRef name = WiFiNetworkGetSSID((__bridge WiFiNetworkRef)networkNow)) {
+						if([(__bridge NSString*)name isEqualToString:networkName]) {
+							if(CFStringRef pass = WiFiNetworkCopyPassword((__bridge WiFiNetworkRef)networkNow)) {
+								passwordRet = [NSString stringWithFormat:@"%@", pass];
+								CFRelease(pass);
+							}
+							break;
+						}
+					}					
+				}
+			}
+		}
+	} @catch(NSException* ex) {
+	}
+	return passwordRet;
+}
+
+
 static NSDictionary* getDicForNetworkName(NSString* networkName)
 {
 	NSDictionary* recordRet = nil;
@@ -380,7 +381,6 @@ static NSDictionary* getDicForNetworkName(NSString* networkName)
 	}
 	return recordRet;
 }
-
 // 获取最后使用wifi的时间
 static NSDate* getLastUseDate(NSDictionary* dic){
 	if(!dic){
@@ -420,25 +420,46 @@ static NSDate* getLastUseDate(NSDictionary* dic){
     }] objectAtIndex:0];
 
 }
+
 %hook WFKnownNetworksViewController
+%property (assign) bool isSortByName;
+
 - (void)setKnownNetworksArray:(id)arg1
 {
-	//NSLog(@"123123%@",networksArray);
-	// return networksArray;
-	arg1 = [arg1 sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2){
-		NSDate *date1 = getLastUseDate(getDicForNetworkName((NSString *)obj1)) ;
-		NSDate *date2 = getLastUseDate(getDicForNetworkName((NSString *)obj2)) ;
-		// if([(NSString *)obj1 isEqualToString:@"dengbasyq209-210"] ){
-		// 	NSLog(@" %@  %@",(NSString *)obj1,getDicForNetworkName((NSString *)obj1));
-		// }
-		//  NSOrderedAscending,    // < 升序
-    	//  NSOrderedSame,       // = 等于
-    	//  NSOrderedDescending   // > 降序
-		return [date2 compare: date1];
-    }];
-	// NSSortDescriptor *ns=[NSSortDescriptor sortDescriptorWithKey:nil ascending:YES];
-	// arg1 = [(NSMutableArray*)arg1 sortedArrayUsingDescriptors:@[ns]];
-	%orig(arg1);
+	if(![self.navigationItem.rightBarButtonItem.title isEqual:@"Recent"]&&![self.navigationItem.rightBarButtonItem isEqual:@"Name"]){
+		self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]initWithTitle:self.isSortByName?@"Name":@"Recent" style:UIBarButtonItemStylePlain target:self  action:@selector(toggleSort)];
+	}
+	// self.navigationItem.rightBarButtonItem = nil;
+	if(self.isSortByName){
+		NSSortDescriptor *ns=[NSSortDescriptor sortDescriptorWithKey:nil ascending:YES];
+		arg1 = [(NSMutableArray*)arg1 sortedArrayUsingDescriptors:@[ns]];
+	}else{
+		arg1 = [arg1 sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2){
+			NSDate *date1 = getLastUseDate(getDicForNetworkName((NSString *)obj1)) ;
+			NSDate *date2 = getLastUseDate(getDicForNetworkName((NSString *)obj2)) ;
+			// if([(NSString *)obj1 isEqualToString:@"dengbasyq209-210"] ){
+			// 	NSLog(@" %@  %@",(NSString *)obj1,getDicForNetworkName((NSString *)obj1));
+			// }
+			//  NSOrderedAscending,    // < 升序
+    		//  NSOrderedSame,       // = 等于
+    		//  NSOrderedDescending   // > 降序
+			return [date2 compare: date1];
+		}];
+	}
+	%orig;
+}
+
+%new
+-(void)toggleSort{
+    self.isSortByName=!self.isSortByName;
+    if (self.isSortByName) {
+       [self.navigationItem.rightBarButtonItem setTitle:@"Name"]; 
+	}
+    else {
+       [self.navigationItem.rightBarButtonItem setTitle:@"Recent"];  
+	}
+	[self setKnownNetworksArray:self.knownNetworksArray];
+	[self.tableView reloadData];
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
@@ -460,10 +481,10 @@ static NSDate* getLastUseDate(NSDictionary* dic){
 	return cell;
 }
 
- - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath
- {
-     return tableView.editing?UITableViewCellEditingStyleDelete:UITableViewCellEditingStyleNone;//UITableViewCellEditingStyleDelete
- }
+- (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+   return tableView.editing?UITableViewCellEditingStyleDelete:UITableViewCellEditingStyleNone;//UITableViewCellEditingStyleDelete
+}
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
@@ -495,6 +516,8 @@ static NSDate* getLastUseDate(NSDictionary* dic){
 		}
     }
 }	
+
+
 %end
 
 

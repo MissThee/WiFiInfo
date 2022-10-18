@@ -3,7 +3,7 @@
 #import <Security/Security.h>
 #import <substrate.h>
 #import <UIKit/UIKit.h>
-
+#import <Preferences/PSListItemsController.h>
 
 extern const char *__progname;
 
@@ -44,18 +44,23 @@ extern "C" CFDictionaryRef WiFiNetworkCopyRecord(WiFiNetworkRef network);
 @interface WFNetworkScanRecord : NSObject
 @property (nonatomic,copy,readonly) NSString * bssid;
 @property (nonatomic,copy,readonly) NSString * ssid;
-@property (nonatomic,readonly) long long rssi;
+@property (assign,readonly) long long rssi;
 @property (nonatomic,retain) NSNumber * channel; 
 @property (assign,nonatomic) long long securityMode;
-@property (retain) NSDictionary * attributes;
+@property (nonatomic,retain) NSDictionary * attributes;
 @property (nonatomic,copy) NSString * crowdsourceDescription;   
 @property (copy,readonly) NSString * description; 
 @property (copy,readonly) NSString * debugDescription; 
 
 @end
 
-@interface WFKnownNetworksViewController : NSObject
-@property (nonatomic,copy) NSArray * knownNetWorksArray; 
+
+
+
+@interface WFKnownNetworksViewController : PSListItemsController
+@property (assign) bool isSortByName;
+@property (nonatomic, retain) NSMutableArray *knownNetworksArray;
+@property (nonatomic,retain) UITableView *tableView;
 @end
 
 
