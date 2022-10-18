@@ -4,6 +4,7 @@
 #import <substrate.h>
 #import <UIKit/UIKit.h>
 
+
 extern const char *__progname;
 
 enum {
@@ -40,18 +41,6 @@ extern "C" CFDictionaryRef WiFiNetworkCopyRecord(WiFiNetworkRef network);
 - (int)securityMode;
 @end
 
-// @interface APTableCell : UITableViewCell {
-// 	UIImageView* _lockView;
-// 	UIImageView* _barsView;
-// }
-// @property (nonatomic,retain) UILabel* labelSec;
-// @property (nonatomic,retain) UILabel* labelRssi;
-// @property (nonatomic,retain) UILabel* labelCan;
-// @property (nonatomic,retain) UILabel* labelMac;
-// @property (nonatomic,retain) WiFiNetwork * network;
-// -(void)setDetailText:(id)arg1 ;
-// @end
-
 @interface WFNetworkScanRecord : NSObject
 @property (nonatomic,copy,readonly) NSString * bssid;
 @property (nonatomic,copy,readonly) NSString * ssid;
@@ -70,20 +59,26 @@ extern "C" CFDictionaryRef WiFiNetworkCopyRecord(WiFiNetworkRef network);
 @end
 
 
+@interface WFAssociationStateView : UIView
+@property (nonatomic,retain) UIImageView* imageView;
+@end
+
 @interface WFNetworkListCell : UITableViewCell
+@property (nonatomic,retain) WFAssociationStateView * associationStateView;  
 @property (nonatomic,retain) UILabel* labelSec;
 @property (nonatomic,retain) UILabel* labelRssi;
-@property (nonatomic,retain) UILabel* labelCan;
+@property (nonatomic,retain) UILabel* labelChannel;
 @property (nonatomic,retain) UILabel* labelMac;
 @property (nonatomic,retain) WFNetworkScanRecord * network;
 @property (nonatomic,copy) NSString * title; 
+@property (nonatomic,copy) NSString * macTmp; // MAC 地址
 @property (nonatomic,copy) NSString * subtitleTmp; 
-@property (assign,nonatomic) BOOL hasInitMacAddr; 
 - (void)setSubtitle:(NSString*)arg1;
 @end
 
 
 @interface WFAirportViewController : UITableViewController
+// -(NSString *)getIPAddress;
 -(id)_currentNetworkCellIndexPath;
 -(WFNetworkScanRecord*)currentNetwork;
 -(void)refresh;
@@ -92,6 +87,7 @@ extern "C" CFDictionaryRef WiFiNetworkCopyRecord(WiFiNetworkRef network);
 @end
 
 @interface WFNetworkListController : UITableViewController 
+
 -(void)startScanning;
 -(void)stopScanning;
 @end

@@ -1,7 +1,12 @@
 #import "WiFiInfo.h"
 #include <dlfcn.h>
-// #define NSLog1(...)
+// 获取wifi ip地址
+#import <ifaddrs.h>
+#import <arpa/inet.h>
+#import <objc/runtime.h>
 
+
+// ------------------------------------------------------------------------------------------------------------------------
 
 static WiFiManagerRef wifiManager()
 {
@@ -51,30 +56,7 @@ static NSString* getPassForNetworkName(NSString* networkName)
 	return passwordRet;
 }
 
-static NSDictionary* getDicForNetworkName(NSString* networkName)
-{
-	NSDictionary* recordRet = nil;
-	@try {
-		if(networkName) {
-			if(CFArrayRef networks = networksListArr()) {
-				for(id networkNow in (__bridge NSArray*)networks) {
-					if(CFStringRef name = WiFiNetworkGetSSID((__bridge WiFiNetworkRef)networkNow)) {
-						if([(__bridge NSString*)name isEqualToString:networkName]) {
-							if(CFDictionaryRef record = WiFiNetworkCopyRecord((__bridge WiFiNetworkRef)networkNow)) {
-								recordRet = (__bridge NSDictionary*)record;
-								CFRelease(record);
-							}
-							break;
-						}
-					}					
-				}
-			}
-		}
-	} @catch(NSException* ex) {
-		// NSLog(@"getLastJoinedAtForNetworkName异常:%@ %@",ex.name,ex.reason);
-	}
-	return recordRet;
-}
+
 
 static NSString* stringForSecurityMode(int securityMode)
 {
@@ -106,7 +88,33 @@ static NSString* stringForSecurityMode(int securityMode)
 	return nil;
 }
 
-
+/*
+// 获取当前wifi ip地址
+static NSString* getIPAddress ()
+{
+    NSString *address = @"error";
+    struct ifaddrs *interfaces = NULL;
+    struct ifaddrs *temp_addr = NULL;
+    // retrieve the current interfaces - returns 0 on success
+    if (getifaddrs(&interfaces) == 0) {
+        // Loop through linked list of interfaces
+        temp_addr = interfaces;
+        while(temp_addr != NULL) {
+            if(temp_addr->ifa_addr->sa_family == AF_INET) {
+                // Check if interface is en0 which is the wifi connection on the iPhone
+                if([[NSString stringWithUTF8String:temp_addr->ifa_name] isEqualToString:@"en0"]) {
+                    // Get NSString from C String
+                    address = [NSString stringWithUTF8String:inet_ntoa(((struct sockaddr_in *)temp_addr->ifa_addr)->sin_addr)];
+                }
+            }
+            temp_addr = temp_addr->ifa_next;
+        }
+    }
+    // Free memory
+    freeifaddrs(interfaces);
+    return address;
+}
+*/
 // -------
 
 static NSArray* networksList;
@@ -136,40 +144,35 @@ static WFNetworkScanRecord* networkForName(NSString* name)
 %hook WFNetworkListCell
 %property (nonatomic, retain) id labelSec;
 %property (nonatomic, retain) id labelRssi;
-%property (nonatomic, retain) id labelCan;
+%property (nonatomic, retain) id labelChannel;
 %property (nonatomic, retain) id labelMac;
 %property (nonatomic, retain) id network;
+%property (nonatomic,copy) NSString * macTmp; // mac地址
 %property (nonatomic,copy) NSString * subtitleTmp; 
-%property (assign,nonatomic) BOOL hasInitMacAddr;    
-- (void)setSubtitle:(NSString*)arg1{
-if ([arg1 hasPrefix:@"MissThee"]){
-	arg1=[arg1 substringFromIndex:8];
-}else{
-	self.subtitleTmp=arg1;
-}
-%orig;
 
-	//NSString* temp=[NSString stringWithFormat:@"%@%@",self.network.bssid?:@"", arg1?[NSString stringWithFormat:@" \n%@",arg1]:@""];
-	//if(temp.length>0){
-	//	arg1 = temp;
-	//}
-	//%orig;
+
+- (void)setSubtitle:(NSString*)arg1{
+	if(arg1!=nil){
+		self.subtitleTmp=arg1;
+	}
+	arg1 = [NSString stringWithFormat:@"%@%@",self.macTmp, self.subtitleTmp?[NSString stringWithFormat:@"\n%@",self.subtitleTmp]:@""];
+	%orig;
 }
+
 - (void)layoutSubviews
 {
 	@try {
 		self.network = networkForName(self.title);
+
 		if(self.network) {
-			if(self.subtitleTmp) {
-				NSString* temp=[NSString stringWithFormat:@"MissThee%@%@",self.network.bssid, self.subtitleTmp?[NSString stringWithFormat:@" \n%@",self.subtitleTmp]:@""];
-				[self setSubtitle:temp];
-			}else{
-				[self setSubtitle:[NSString stringWithFormat:@"MissThee%@",self.network.bssid]];
-			}
-			UIImageView* _barsView = (UIImageView *)object_getIvar(self, class_getInstanceVariable([self class], "_signalImageView"));
+			// mac地址--------------------
+			self.macTmp = self.network.bssid;
+			[self setSubtitle:nil];
+			// NSLog(@"%@\n%@",@"-----------------------------------",self.network);
 			UIImageView* _lockView = (UIImageView *)object_getIvar(self, class_getInstanceVariable([self class], "_lockImageView"));
-		
+			// lock icon
 			if(_lockView) {
+				// --------------------
 				if(!self.labelSec) {
 					self.labelSec = (UILabel *)[_lockView viewWithTag:4455]?:[[UILabel alloc] init];
 					self.labelSec.tag = 4455;
@@ -187,9 +190,11 @@ if ([arg1 hasPrefix:@"MissThee"]){
 					[_lockView addSubview:self.labelSec];
 				}
 			}
-			
+			// NSLog(@"-------------------\n%@\n%@",self.associationStateView.imageView ,getIPAddress());
+			// signal icon
+			UIImageView* _barsView = (UIImageView *)object_getIvar(self, class_getInstanceVariable([self class], "_signalImageView"));
 			if(_barsView) {
-				
+				// --------------------
 				if(!self.labelRssi) {
 					self.labelRssi = (UILabel *)[_barsView viewWithTag:4456]?:[[UILabel alloc] init];
 					self.labelRssi.tag = 4456;
@@ -201,7 +206,6 @@ if ([arg1 hasPrefix:@"MissThee"]){
 				@try {
 					rssiSignal = [@([self.network rssi]) stringValue];
 				} @catch(NSException* ex) {
-					
 				}
 				[self.labelRssi setText:rssiSignal];
 				[self.labelRssi setBackgroundColor:[UIColor clearColor]];
@@ -212,14 +216,14 @@ if ([arg1 hasPrefix:@"MissThee"]){
 				if([_barsView viewWithTag:4456]==nil) {
 					[_barsView addSubview:self.labelRssi];
 				}
-				
-				if(!self.labelCan) {
-					self.labelCan = (UILabel *)[_barsView viewWithTag:4457]?:[[UILabel alloc] init];
-					self.labelCan.tag = 4457;
+				// --------------------
+				if(!self.labelChannel) {
+					self.labelChannel = (UILabel *)[_barsView viewWithTag:4457]?:[[UILabel alloc] init];
+					self.labelChannel.tag = 4457;
 				}
-				[self.labelCan setText:nil];
-				self.labelCan.center = _barsView.center;
-				self.labelCan.frame = CGRectMake(0, 0-6 , _barsView.frame.size.width, 10);
+				[self.labelChannel setText:nil];
+				self.labelChannel.center = _barsView.center;
+				self.labelChannel.frame = CGRectMake(0, 0-5 , _barsView.frame.size.width, 10);
 				NSString* canNumber = nil;
 				@try {
 					canNumber = [[self.network channel] stringValue];
@@ -227,40 +231,38 @@ if ([arg1 hasPrefix:@"MissThee"]){
 						canNumber = [NSString stringWithFormat:@"%@", canNumber];
 					}
 				} @catch(NSException* ex) {
-					
 				}
-				[self.labelCan setText:canNumber];
-				[self.labelCan setBackgroundColor:[UIColor clearColor]];
-				[self.labelCan setNumberOfLines:0];
-				self.labelCan.font = [UIFont systemFontOfSize:10];
-				self.labelCan.textAlignment = NSTextAlignmentCenter;
-				self.labelCan.adjustsFontSizeToFitWidth = YES;
+				[self.labelChannel setText:canNumber];
+				[self.labelChannel setBackgroundColor:[UIColor clearColor]];
+				[self.labelChannel setNumberOfLines:0];
+				self.labelChannel.font = [UIFont systemFontOfSize:10];
+				self.labelChannel.textAlignment = NSTextAlignmentCenter;
+				self.labelChannel.adjustsFontSizeToFitWidth = YES;
 				if([_barsView viewWithTag:4457]==nil) {
-					[_barsView addSubview:self.labelCan];
+					[_barsView addSubview:self.labelChannel];
 				}
-				
-				if(!self.labelMac) {
-					self.labelMac = (UILabel *)[_barsView viewWithTag:4458]?:[[UILabel alloc] init];
-					self.labelMac.tag = 4458;
-				}
-				[self.labelMac setText:nil];
-				//self.labelMac.center = _barsView.center;
-				self.labelMac.frame = CGRectMake(20, 20, 200, 8);
-				NSString* macAddr = nil;
-				@try {
-					macAddr = self.network.bssid;
-				} @catch(NSException* ex) {
-					
-				}
-				[self.labelMac setText:macAddr];
-				[self.labelMac setBackgroundColor:[UIColor clearColor]];
-				[self.labelMac setNumberOfLines:0];
-				self.labelMac.font = [UIFont systemFontOfSize:10];
-				self.labelMac.textAlignment = NSTextAlignmentLeft;
-				self.labelMac.adjustsFontSizeToFitWidth = YES;
-				if([_barsView viewWithTag:4458]==nil) {
-					[_barsView addSubview:self.labelMac];
-				}
+				// --------------------
+				// if(!self.labelMac) {
+				// 	self.labelMac = (UILabel *)[_barsView viewWithTag:4458]?:[[UILabel alloc] init];
+				// 	self.labelMac.tag = 4458;
+				// }
+				// [self.labelMac setText:nil];
+				// //self.labelMac.center = _barsView.center;
+				// self.labelMac.frame = CGRectMake(20, 20, 200, 8);
+				// NSString* macAddr = nil;
+				// @try {
+				// 	macAddr = self.network.bssid;
+				// } @catch(NSException* ex) {
+				// }
+				// [self.labelMac setText:macAddr];
+				// [self.labelMac setBackgroundColor:[UIColor clearColor]];
+				// [self.labelMac setNumberOfLines:0];
+				// self.labelMac.font = [UIFont systemFontOfSize:10];
+				// self.labelMac.textAlignment = NSTextAlignmentLeft;
+				// self.labelMac.adjustsFontSizeToFitWidth = YES;
+				// if([_barsView viewWithTag:4458]==nil) {
+				// 	[_barsView addSubview:self.labelMac];
+				// }
 			}
 		
 		}
@@ -275,11 +277,13 @@ if ([arg1 hasPrefix:@"MissThee"]){
 static WFNetworkListController* currDelegate;
 
 %hook WFAirportViewController
+
 -(void)setListDelegate:(id)arg1
 {
 	currDelegate = arg1;
 	%orig;
 }
+
 -(void)setNetworks:(NSSet*)arg1
 {
 	@try {
@@ -352,7 +356,36 @@ static WFNetworkListController* currDelegate;
 }
 %end
 
+static NSDictionary* getDicForNetworkName(NSString* networkName)
+{
+	NSDictionary* recordRet = nil;
+	@try {
+		if(networkName) {
+			if(CFArrayRef networks = networksListArr()) {
+				for(id networkNow in (__bridge NSArray*)networks) {
+					if(CFStringRef name = WiFiNetworkGetSSID((__bridge WiFiNetworkRef)networkNow)) {
+						if([(__bridge NSString*)name isEqualToString:networkName]) {
+							if(CFDictionaryRef record = WiFiNetworkCopyRecord((__bridge WiFiNetworkRef)networkNow)) {
+								recordRet = (__bridge NSDictionary*)record;
+								CFRelease(record);
+							}
+							break;
+						}
+					}					
+				}
+			}
+		}
+	} @catch(NSException* ex) {
+		// NSLog(@"getLastJoinedAtForNetworkName异常:%@ %@",ex.name,ex.reason);
+	}
+	return recordRet;
+}
+
+// 获取最后使用wifi的时间
 static NSDate* getLastUseDate(NSDictionary* dic){
+	if(!dic){
+		return [NSDate dateWithTimeIntervalSince1970:0];
+	}
 	NSMutableArray* dates = [[NSMutableArray alloc] init];
 	// NSDate *addedAt = (NSDate *)[dic objectForKey:@"lastUpdated"];
 	// if(addedAt){
@@ -362,6 +395,11 @@ static NSDate* getLastUseDate(NSDictionary* dic){
 	// if(knownBSSUpdatedDate){
 	// 	 [dates addObject:knownBSSUpdatedDate];
 	// }
+	[dates addObject:[NSDate dateWithTimeIntervalSince1970:0]];
+	NSDate *addedAt = (NSDate *)[dic objectForKey:@"addedAt"];
+	if(addedAt){
+		 [dates addObject:addedAt];
+	}
 	NSDate *lastAutoJoined = (NSDate *)[dic objectForKey:@"lastAutoJoined"];
 	if(lastAutoJoined){
 		 [dates addObject:lastAutoJoined];
@@ -369,10 +407,6 @@ static NSDate* getLastUseDate(NSDictionary* dic){
 	NSDate *lastJoined = (NSDate *)[dic objectForKey:@"lastJoined"];
 	if(lastJoined){
 		 [dates addObject:lastJoined];
-	}
-	NSDate *lastUpdated = (NSDate *)[dic objectForKey:@"lastUpdated"];
-	if(lastUpdated){
-		 [dates addObject:lastUpdated];
 	}
 	NSDate *prevJoined = (NSDate *)[dic objectForKey:@"prevJoined"];
 	if(prevJoined){
@@ -386,11 +420,12 @@ static NSDate* getLastUseDate(NSDictionary* dic){
     }] objectAtIndex:0];
 
 }
-
 %hook WFKnownNetworksViewController
-- (id)knownNetworksArray{
-	id networksArray = %orig;
-	return [networksArray sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2){
+- (void)setKnownNetworksArray:(id)arg1
+{
+	//NSLog(@"123123%@",networksArray);
+	// return networksArray;
+	arg1 = [arg1 sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2){
 		NSDate *date1 = getLastUseDate(getDicForNetworkName((NSString *)obj1)) ;
 		NSDate *date2 = getLastUseDate(getDicForNetworkName((NSString *)obj2)) ;
 		// if([(NSString *)obj1 isEqualToString:@"dengbasyq209-210"] ){
@@ -402,8 +437,8 @@ static NSDate* getLastUseDate(NSDictionary* dic){
 		return [date2 compare: date1];
     }];
 	// NSSortDescriptor *ns=[NSSortDescriptor sortDescriptorWithKey:nil ascending:YES];
-	// return [(NSMutableArray*)networksArray sortedArrayUsingDescriptors:@[ns]];
- 
+	// arg1 = [(NSMutableArray*)arg1 sortedArrayUsingDescriptors:@[ns]];
+	%orig(arg1);
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
@@ -419,23 +454,21 @@ static NSDate* getLastUseDate(NSDictionary* dic){
       	cell.detailTextLabel.text = getPassForNetworkName(wfname)?:@"";
       	cell.detailTextLabel.numberOfLines = 0;
       	cell.detailTextLabel.textColor = [UIColor grayColor];
-      
 	} @catch(NSException* ex) {
 	}
 	
 	return cell;
 }
 
-- (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath
-{
-    return tableView.editing?UITableViewCellEditingStyleDelete:UITableViewCellEditingStyleNone;
-}
+ - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath
+ {
+     return tableView.editing?UITableViewCellEditingStyleDelete:UITableViewCellEditingStyleNone;//UITableViewCellEditingStyleDelete
+ }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
-// 点击事件,点击的cell
-// UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
-  
+	// 点击事件,点击的cell
+	// UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
 }
 
 %new
@@ -471,6 +504,5 @@ static NSDate* getLastUseDate(NSDictionary* dic){
 		dlopen("/System/Library/PreferenceBundles/AirPortSettings.bundle/AirPortSettings", RTLD_LAZY);
 		dlopen("/System/Library/PrivateFrameworks/WiFiKit.framework/WiFiKit", RTLD_LAZY);
 		dlopen("/System/Library/PrivateFrameworks/WiFiKitUI.framework/WiFiKitUI", RTLD_LAZY);
-		
 	}
 }
