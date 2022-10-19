@@ -425,14 +425,27 @@ static NSDate* getLastUseDate(NSDictionary* dic){
 
 %hook WFKnownNetworksViewController
 %property (assign,nonatomic) int sortType;
-
+%property (assign,nonatomic) BOOL hasSetBarButton;
 - (void)setKnownNetworksArray:(id)arg1
 {
-	if(![self.navigationItem.rightBarButtonItem.title isEqual:@"↑↓"]){
+	if(!self.hasSetBarButton){
 		self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]initWithTitle: @"↑↓"  style:UIBarButtonItemStylePlain target:self  action:@selector(toggleSort)];
+		self.hasSetBarButton = YES;
 	}
 	// self.navigationItem.rightBarButtonItem = nil;
 	if(self.sortType==1){
+		arg1 = [arg1 sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2){
+			NSDate *date1 = getLastUseDate(getDicForNetworkName((NSString *)obj1)) ;
+			NSDate *date2 = getLastUseDate(getDicForNetworkName((NSString *)obj2)) ;
+			// if([(NSString *)obj1 isEqualToString:@"dengbasyq209-210"] ){
+			// 	NSLog(@" %@  %@",(NSString *)obj1,getDicForNetworkName((NSString *)obj1));
+			// }
+			//  NSOrderedAscending,    // < 升序
+    		//  NSOrderedSame,       // = 等于
+    		//  NSOrderedDescending   // > 降序
+			return [date2 compare: date1];
+		}];
+	}else if(self.sortType==2){
 		// NSSortDescriptor *ns=[NSSortDescriptor sortDescriptorWithKey:nil ascending:YES];
 		// arg1 = [(NSMutableArray*)arg1 sortedArrayUsingDescriptors:@[ns]];
 		arg1 = [arg1 sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2){
@@ -485,18 +498,6 @@ static NSDate* getLastUseDate(NSDictionary* dic){
 				}
 			}
 		}];
-	}else if(self.sortType==2){
-		arg1 = [arg1 sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2){
-			NSDate *date1 = getLastUseDate(getDicForNetworkName((NSString *)obj1)) ;
-			NSDate *date2 = getLastUseDate(getDicForNetworkName((NSString *)obj2)) ;
-			// if([(NSString *)obj1 isEqualToString:@"dengbasyq209-210"] ){
-			// 	NSLog(@" %@  %@",(NSString *)obj1,getDicForNetworkName((NSString *)obj1));
-			// }
-			//  NSOrderedAscending,    // < 升序
-    		//  NSOrderedSame,       // = 等于
-    		//  NSOrderedDescending   // > 降序
-			return [date2 compare: date1];
-		}];
 	}
 	%orig;
 }
@@ -507,7 +508,11 @@ static NSDate* getLastUseDate(NSDictionary* dic){
     if(self.sortType>2){
 		self.sortType = 1;
 	}
-    //  [self.navigationItem.rightBarButtonItem setTitle:@"Name"]; 
+	if(self.sortType==1){
+    	[self.navigationItem.rightBarButtonItem setTitle:@"Recent"]; 
+	}else if(self.sortType==21){
+    	[self.navigationItem.rightBarButtonItem setTitle:@"Name"]; 
+	}
 	[self setKnownNetworksArray:self.knownNetworksArray];
 	[self.tableView reloadData];
 }
