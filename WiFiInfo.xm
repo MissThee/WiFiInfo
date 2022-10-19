@@ -421,19 +421,71 @@ static NSDate* getLastUseDate(NSDictionary* dic){
 
 }
 
+ 
+
 %hook WFKnownNetworksViewController
-%property (assign) bool isSortByName;
+%property (assign,nonatomic) int sortType;
 
 - (void)setKnownNetworksArray:(id)arg1
 {
-	if(![self.navigationItem.rightBarButtonItem.title isEqual:@"Recent"]&&![self.navigationItem.rightBarButtonItem isEqual:@"Name"]){
-		self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]initWithTitle:self.isSortByName?@"Name":@"Recent" style:UIBarButtonItemStylePlain target:self  action:@selector(toggleSort)];
+	if(![self.navigationItem.rightBarButtonItem.title isEqual:@"↑↓"]){
+		self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]initWithTitle: @"↑↓"  style:UIBarButtonItemStylePlain target:self  action:@selector(toggleSort)];
 	}
 	// self.navigationItem.rightBarButtonItem = nil;
-	if(self.isSortByName){
-		NSSortDescriptor *ns=[NSSortDescriptor sortDescriptorWithKey:nil ascending:YES];
-		arg1 = [(NSMutableArray*)arg1 sortedArrayUsingDescriptors:@[ns]];
-	}else{
+	if(self.sortType==1){
+		// NSSortDescriptor *ns=[NSSortDescriptor sortDescriptorWithKey:nil ascending:YES];
+		// arg1 = [(NSMutableArray*)arg1 sortedArrayUsingDescriptors:@[ns]];
+		arg1 = [arg1 sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2){
+			NSMutableString * name1 = [[NSMutableString alloc]initWithString:obj1];
+			NSMutableString * name2 = [[NSMutableString alloc]initWithString:obj2];
+			NSString *firstWord1=[obj1 substringToIndex:1];
+			NSString *firstWord2=[obj2 substringToIndex:1];
+			// unichar firstChar1=[obj1 characterAtIndex:1];
+			// unichar firstChar2=[obj2 characterAtIndex:1];
+			if(![obj2 length]||![obj1 length]){
+				return [obj1 compare: obj2 options:NSLiteralSearch];
+			}
+			CFStringTransform((__bridge CFMutableStringRef)name1, NULL, kCFStringTransformToLatin, NO);
+			CFStringTransform((__bridge CFMutableStringRef)name1, NULL, kCFStringTransformStripCombiningMarks, NO);
+			CFStringTransform((__bridge CFMutableStringRef)name2, NULL, kCFStringTransformToLatin, NO);
+			CFStringTransform((__bridge CFMutableStringRef)name2, NULL, kCFStringTransformStripCombiningMarks, NO);
+			// NSLog(@"------\n%@,%@,%@,%@",name1,firstWord1,name2,firstWord2);
+
+			NSComparisonResult result1 = [[name1 substringToIndex:1] compare:[name2 substringToIndex:1] options:NSCaseInsensitiveSearch];
+			NSString *name1FirstWord=[name1 substringToIndex:1];
+			NSString *name2FirstWord=[name2 substringToIndex:1];
+			
+			// 首字母分块
+			if(result1!=NSOrderedSame){
+				return result1;
+			}else {
+				// 中文在后
+				if([name1FirstWord isEqualToString:firstWord1]&&![name2FirstWord isEqualToString:firstWord2]){
+					return NSOrderedAscending;
+				}else if(![name1FirstWord isEqualToString:firstWord1]&&[name2FirstWord isEqualToString:firstWord2]){
+					return NSOrderedDescending;
+				}else{
+					// 大写字母在后
+					for (int i = 0; i<([name1 length]>[name2 length]?[name2 length]:[name1 length]); i++){
+						char name1FirstChar=[name1 characterAtIndex:i];
+						char name2FirstChar=[name2 characterAtIndex:i];
+						if((name1FirstChar>='a'&&name1FirstChar<='z')&&(name2FirstChar>='A'&&name2FirstChar<='Z')){
+							return NSOrderedAscending;
+						}else if((name1FirstChar>='A'&&name1FirstChar<='Z')&&(name2FirstChar>='a'&&name2FirstChar<='z')){
+							return NSOrderedDescending;
+						}
+					}
+					if([name1 length]>[name2 length]){
+						return NSOrderedDescending;
+					}else if([name1 length]<[name2 length]){
+						return NSOrderedAscending;
+					}else{
+						return NSOrderedSame;
+					}
+				}
+			}
+		}];
+	}else if(self.sortType==2){
 		arg1 = [arg1 sortedArrayUsingComparator:^NSComparisonResult(id obj1, id obj2){
 			NSDate *date1 = getLastUseDate(getDicForNetworkName((NSString *)obj1)) ;
 			NSDate *date2 = getLastUseDate(getDicForNetworkName((NSString *)obj2)) ;
@@ -451,13 +503,11 @@ static NSDate* getLastUseDate(NSDictionary* dic){
 
 %new
 -(void)toggleSort{
-    self.isSortByName=!self.isSortByName;
-    if (self.isSortByName) {
-       [self.navigationItem.rightBarButtonItem setTitle:@"Name"]; 
+    self.sortType+=1;
+    if(self.sortType>2){
+		self.sortType = 1;
 	}
-    else {
-       [self.navigationItem.rightBarButtonItem setTitle:@"Recent"];  
-	}
+    //  [self.navigationItem.rightBarButtonItem setTitle:@"Name"]; 
 	[self setKnownNetworksArray:self.knownNetworksArray];
 	[self.tableView reloadData];
 }
@@ -483,7 +533,12 @@ static NSDate* getLastUseDate(NSDictionary* dic){
 
 - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-   return tableView.editing?UITableViewCellEditingStyleDelete:UITableViewCellEditingStyleNone;//UITableViewCellEditingStyleDelete
+	if(self.sortType==0){
+		return %orig;
+	}else{
+		return UITableViewCellEditingStyleNone;
+	}
+    // return tableView.editing?UITableViewCellEditingStyleDelete:UITableViewCellEditingStyleNone;
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath

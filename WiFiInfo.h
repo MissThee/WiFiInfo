@@ -58,7 +58,7 @@ extern "C" CFDictionaryRef WiFiNetworkCopyRecord(WiFiNetworkRef network);
 
 
 @interface WFKnownNetworksViewController : PSListItemsController
-@property (assign) bool isSortByName;
+@property (assign,nonatomic) int sortType; // 0不排序；1时间倒序；2名称正序
 @property (nonatomic, retain) NSMutableArray *knownNetworksArray;
 @property (nonatomic,retain) UITableView *tableView;
 @end
